@@ -1,101 +1,107 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useAppContext } from './context/AppContext';
+import dynamic from 'next/dynamic';
+import { ApexOptions } from 'apexcharts';
+import Link from 'next/link';
+
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+
+export default function Dashboard() {
+  const { accounts, transfers } = useAppContext();
+
+  // Calculate monthly volumes for each recipient account
+  const monthlyVolumes = transfers.reduce((acc, transfer) => {
+    const month = new Date(transfer.date).toLocaleString('default', { month: 'long' });
+    transfer.recipients.forEach(recipient => {
+      if (!acc[recipient.accountId]) {
+        acc[recipient.accountId] = {};
+      }
+      acc[recipient.accountId][month] = (acc[recipient.accountId][month] || 0) + recipient.amount;
+    });
+    return acc;
+  }, {} as Record<string, Record<string, number>>);
+
+  // Prepare data for the chart
+  const months = Array.from(new Set(transfers.map(t => new Date(t.date).toLocaleString('default', { month: 'long' }))));
+  const chartSeries = Object.entries(monthlyVolumes).map(([accountId, volumes]) => ({
+    name: accounts.find(a => a.id === accountId)?.name || 'Unknown Account',
+    data: months.map(month => volumes[month] || 0)
+  }));
+
+  const chartOptions: ApexOptions = {
+    chart: {
+      type: 'line',
+      height: 350,
+      animations: {
+        enabled: true,
+        easing: 'easeinout',
+        speed: 800,
+        animateGradually: {
+          enabled: true,
+          delay: 150
+        },
+        dynamicAnimation: {
+          enabled: true,
+          speed: 350
+        }
+      }
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 3
+    },
+    xaxis: {
+      categories: months,
+    },
+    yaxis: {
+      title: {
+        text: 'Amount'
+      }
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return "$ " + val.toFixed(2)
+        }
+      }
+    },
+    legend: {
+      position: 'top'
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <Link href="/transfer" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+          New Transfer
+        </Link>
+      </div>
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Account Balances</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {accounts.map(account => (
+              <div key={account.id} className={`p-4 rounded-lg ${account.balance < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
+                <h3 className="font-semibold text-gray-900">{account.name}</h3>
+                <p className="text-sm text-gray-600">Type: {account.type}</p>
+                <p className={`font-bold text-lg ${account.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  ${account.balance.toFixed(2)}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Volume by Recipient Account</h2>
+          <Chart options={chartOptions} series={chartSeries} type="line" height={350} />
+        </div>
+      </div>
     </div>
   );
 }
+
