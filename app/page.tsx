@@ -4,11 +4,17 @@ import { useAppContext } from './context/AppContext';
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
 import Link from 'next/link';
+import { useState } from 'react';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 export default function Dashboard() {
   const { accounts, transfers } = useAppContext();
+  const [filter, setFilter] = useState<'all' | 'savings' | 'checking' | 'investment'>('all');
+
+  const filteredAccounts = accounts.filter(account => 
+    filter === 'all' ? true : account.type === filter
+  );
 
   // Calculate monthly volumes for each recipient account
   const monthlyVolumes = transfers.reduce((acc, transfer) => {
@@ -81,9 +87,27 @@ export default function Dashboard() {
       </div>
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Account Balances</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Volume by Recipient Account</h2>
+          <Chart options={chartOptions} series={chartSeries} type="line" height={350} />
+        </div>
+      </div>
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Account Balances ({filteredAccounts.length})</h2>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as 'all' | 'savings' | 'checking' | 'investment')}
+              className="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+            >
+              <option value="all">All Accounts</option>
+              <option value="savings">Savings</option>
+              <option value="checking">Checking</option>
+              <option value="investment">Investment</option>
+            </select>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {accounts.map(account => (
+            {filteredAccounts.map(account => (
               <div key={account.id} className={`p-4 rounded-lg ${account.balance < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
                 <h3 className="font-semibold text-gray-900">{account.name}</h3>
                 <p className="text-sm text-gray-600">Type: {account.type}</p>
@@ -95,12 +119,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Volume by Recipient Account</h2>
-          <Chart options={chartOptions} series={chartSeries} type="line" height={350} />
-        </div>
-      </div>
+      
     </div>
   );
 }
